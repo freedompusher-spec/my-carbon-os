@@ -1,45 +1,83 @@
----
-# yaml-language-server: $schema=https://schema.blue-build.org/recipe-v1.json
-# image will be published to ghcr.io/<user>/<name>
-name: template
-# description will be included in the image's metadata
-description: This is my personal OS image.
-
-# the base image to build on top of (FROM) and the version tag to use
+name: carbon-omarchy
+description: ThinkPad X1 Hyprland. Ghostty + Omarchy Visuals. No dev bloat.
 base-image: ghcr.io/ublue-os/silverblue-main
-image-version: 42 # latest is also supported if you want new updates ASAP
+image-version: latest
 
-# module configuration, executed in order
-# you can include multiple instances of the same module
 modules:
+  # 1. Add Repositories
+  - type: script
+    snippets:
+      - "dnf copr enable -y ashbuk/Hyprland-Fedora"       # Stable Hyprland
+      - "dnf copr enable -y cfergeau/walker"              # App Launcher
+      - "dnf copr enable -y pgdev/ghostty"                # Ghostty Terminal
+      - "dnf copr enable -y monkeygold/nautilus-open-any-terminal" # 'Open Terminal Here'
+      - "dnf config-manager --set-enabled google-chrome"  # Chrome
+
+  # 2. Install Packages
+  - type: rpm-ostree
+    install:
+      # --- Hyprland Core ---
+      - hyprland
+      - hyprlock
+      - hypridle
+      - xdg-desktop-portal-hyprland
+      - polkit-gnome
+      
+      # --- Visuals & UI ---
+      - waybar
+      - walker
+      - swaync
+      - swww
+      - grim
+      - slurp
+      - wl-clipboard
+      - google-chrome-stable
+      
+      # --- The "Cool" Stack ---
+      - ghostty
+      - starship
+      - zsh
+      - zsh-autosuggestions
+      - zsh-syntax-highlighting
+
+      # --- GNOME Convenience (The "Just Works" stuff) ---
+      - cliphist                  # Clipboard History
+      - wlsunset                  # Night Light
+      - swappy                    # Screenshot Editor
+      - nautilus-open-any-terminal
+      - file-roller               # Archive Manager
+      - loupe                     # Image Viewer
+      - gnome-disk-utility
+      - gnome-system-monitor
+      - adw-gtk3-theme            # Theme polish
+      
+      # --- Fonts (Crucial for looks) ---
+      - jetbrains-mono-nerd-font
+      - fontawesome-fonts
+      
+      # --- Hardware: ThinkPad X1 & Intel ---
+      - blueman
+      - network-manager-applet
+      - pavucontrol
+      - pamixer
+      - brightnessctl
+      - libva-utils
+      - intel-media-driver
+
+      # --- Editors ---
+      - nano-default-editor
+      - fastfetch
+
+  # 3. Intel GPU Fix
   - type: files
     files:
-      - source: system
-        destination: / # copies files/system/* (* means everything inside it) into your image's root folder /
+      - source: system/intel-env.sh
+        destination: /etc/profile.d/intel-env.sh
 
-  - type: dnf
-    repos:
-      copr:
-        - atim/starship
-    install:
-      packages:
-        - micro
-        - starship
-    remove:
-      packages:
-        # example: removing firefox (in favor of the flatpak)
-        # "firefox" is the main package, "firefox-langpacks" is a dependency
-        - firefox
-        - firefox-langpacks # also remove firefox dependency (not required for all packages, this is a special case)
-
+  # 4. Flatpaks
   - type: default-flatpaks
-    configurations:
-      - notify: true # Send notification after install/uninstall is finished (true/false)
-        scope: system
-        # If no repo information is specified, Flathub will be used by default
-        install: # system flatpaks we want all users to have and not remove
-          - org.mozilla.firefox
-          - org.gnome.Loupe
-      - scope: user # Also add Flathub user repo, but no user packages
-
-  - type: signing # this sets up the proper policy & signing files for signed images to work fully
+    notify: true
+    system:
+      install:
+        - io.github.flattool.Warehouse
+        - com.spotify.Client

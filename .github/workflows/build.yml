@@ -32,16 +32,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Install BlueBuild CLI
+      - name: Build Image (Force Shell)
         run: |
-          curl -Ls https://sh.blue-build.org/install | bash
-
-      - name: Build Image
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          # We call the binary using its FULL PATH to avoid "command not found"
-          $HOME/.local/bin/bluebuild build ./recipes/${{ matrix.recipe }} \
-            --registry ghcr.io \
-            --push \
-            --no-sign
+          # We force the container to open a shell and run our command
+          # This bypasses the broken entrypoint/dumb-init errors
+          docker run --rm \
+            -v ${{ github.workspace }}:/github/workspace \
+            -w /github/workspace \
+            -e GITHUB_TOKEN=${{ github.token }} \
+            -e COSIGN_PRIVATE_KEY="" \
+            --entrypoint /bin/sh \
+            ghcr.io/blue-build/cli:latest \
+            -c "bluebuild build ./recipes/${{ matrix.recipe }} --registry ghcr.io --push --no-sign"

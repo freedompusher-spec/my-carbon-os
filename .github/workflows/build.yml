@@ -25,11 +25,22 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Build Image
-        uses: docker://ghcr.io/blue-build/cli:latest
-        with:
-          # FIX: Added 'bluebuild' to the start of the command
-          args: bluebuild build ./recipes/${{ matrix.recipe }} --registry ghcr.io --push --no-sign
+      - name: Build Image (Manual)
         env:
+          # Token needed to push the image
+          registry_token: ${{ github.token }}
+          # Explicitly empty key to prevent warnings
           COSIGN_PRIVATE_KEY: ""
-          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # We run the builder container directly using docker
+          # This bypasses all the Action wrapper logic
+          docker run --rm \
+            -v ${{ github.workspace }}:/github/workspace \
+            -w /github/workspace \
+            -e GITHUB_TOKEN=$registry_token \
+            -e COSIGN_PRIVATE_KEY="" \
+            ghcr.io/blue-build/cli:latest \
+            bluebuild build ./recipes/${{ matrix.recipe }} \
+            --registry ghcr.io \
+            --push \
+            --no-sign

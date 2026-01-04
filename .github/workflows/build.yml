@@ -25,24 +25,37 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Build Image
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+      # 1. Install Cosign Tool
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.3.0
+
+      # 2. FORCE RESET KEYS (The Fix)
+      # We delete the dummy file you made so it doesn't conflict.
+      # Then we generate a fresh, valid pair that matches perfectly.
+      - name: Reset & Generate Keys
+        id: keys
         run: |
-          # 1. We run the build container manually.
-          # 2. We fix the git safety check.
-          # 3. We pass --no-sign (which works now because cosign.pub exists).
+          # Delete existing keys (the dummy ones) to prevent mismatch errors
+          rm -f cosign.pub cosign.key
           
-          docker run --rm \
-            --privileged \
-            -v ${{ github.workspace }}:/github/workspace \
-            -w /github/workspace \
-            -e GITHUB_TOKEN=${{ github.token }} \
-            --entrypoint /bin/sh \
-            ghcr.io/blue-build/cli:latest \
-            -c "git config --global --add safe.directory /github/workspace && \
-                bluebuild build ./recipes/${{ matrix.recipe }} \
-                --registry ghcr.io \
-                --registry-namespace $(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]') \
-                --push \
-                --no-sign"
+          # Generate a brand new matching pair for this specific build
+          export COSIGN_PASSWORD=""
+          cosign generate-key-pair
+          
+          # Read the new Private Key so we can pass it to the builder
+          echo 'private_key<<EOF' >> $GITHUB_OUTPUT
+          cat cosign.key >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      # 3. Build Image (Official Action)
+      # We use the official action (no Docker hacks) because now we have valid keys.
+      - name: Build Custom Image
+        uses: blue-build/github-action@v1
+        with:
+          recipe: ${{ matrix.recipe }}
+          # We pass the key we just generated above
+          cosign_private_key: ${{ steps.keys.outputs.private_key }}
+          registry_token: ${{ github.token }}
+          pr_event_number: ${{ github.event.number }}
+        env:
+          COSIGN_PASSWORD: ""

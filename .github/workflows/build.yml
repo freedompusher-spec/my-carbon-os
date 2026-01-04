@@ -25,29 +25,19 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
-      - name: Install BlueBuild CLI
-        run: |
-          curl -Ls https://sh.blue-build.org/install | bash
-
-      - name: Verify Recipe Exists
-        run: |
-          ls -l ./recipes/${{ matrix.recipe }}
-
       - name: Build Image
         env:
+          # We pass the token so the CLI can push the image
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          # We provide ALL the details explicitly to prevent guessing errors
-          $HOME/.local/bin/bluebuild build ./recipes/${{ matrix.recipe }} \
-            --registry ghcr.io \
-            --registry-namespace ${{ github.repository_owner }} \
-            --push \
-            --no-sign \
-            -v
+          # We run the builder container with --privileged
+          # This allows it to run Podman/Buildah inside itself
+          docker run --rm \
+            --privileged \
+            -v ${{ github.workspace }}:/github/workspace \
+            -w /github/workspace \
+            -e GITHUB_TOKEN=${{ github.token }} \
+            -e COSIGN_PRIVATE_KEY="" \
+            --entrypoint /bin/sh \
+            ghcr.io/blue-build/cli:latest \
+            -c "bluebuild build ./recipes/${{ matrix.recipe }} --registry ghcr.io --registry-namespace ${{ github.repository_owner }} --push --no-sign"

@@ -25,33 +25,34 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # 1. Install Cosign (The security tool)
+      # 1. Install Cosign
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.3.0
 
-      # 2. Generate a Fresh Key Pair
-      # This creates a brand new 'cosign.key' and 'cosign.pub' just for this run.
-      # We capture the private key into a variable so we can pass it to the builder.
-      - name: Generate Disposable Keys
+      # 2. Generate Keys & Place them CORRECTLY
+      # We generate keys and force 'cosign.pub' to exist in the root folder.
+      # This stops the "Unable to find private/public key pair" error.
+      - name: Setup Signing Keys
         id: keys
         run: |
-          # Set empty password for the key
           export COSIGN_PASSWORD=""
-          # Generate the pair
           cosign generate-key-pair
           
-          # Read the private key into a GitHub Output variable
+          # Force the public key to be where the action expects it
+          mv cosign.pub ./cosign.pub
+          mv cosign.key ./cosign.key
+
+          # Read Private Key for the next step
           echo 'private_key<<EOF' >> $GITHUB_OUTPUT
-          cat cosign.key >> $GITHUB_OUTPUT
+          cat ./cosign.key >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
 
-      # 3. Build Image (Using the official action)
-      # We pass the key we just generated. The builder is happy because it has a key.
+      # 3. Build Image
+      # Now the action sees 'cosign.pub' on disk AND gets the private key via input.
       - name: Build Custom Image
         uses: blue-build/github-action@v1
         with:
           recipe: ${{ matrix.recipe }}
-          # We pass the content of the key we generated above
           cosign_private_key: ${{ steps.keys.outputs.private_key }}
           registry_token: ${{ github.token }}
           pr_event_number: ${{ github.event.number }}

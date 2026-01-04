@@ -29,30 +29,25 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.3.0
 
-      # 2. Generate Keys & Place them CORRECTLY
-      # We generate keys and force 'cosign.pub' to exist in the root folder.
-      # This stops the "Unable to find private/public key pair" error.
+      # 2. Generate Keys
       - name: Setup Signing Keys
         id: keys
         run: |
           export COSIGN_PASSWORD=""
+          # This command creates 'cosign.pub' and 'cosign.key' right here.
           cosign generate-key-pair
           
-          # Force the public key to be where the action expects it
-          mv cosign.pub ./cosign.pub
-          mv cosign.key ./cosign.key
-
-          # Read Private Key for the next step
+          # We read the Private Key into a variable for the next step.
           echo 'private_key<<EOF' >> $GITHUB_OUTPUT
-          cat ./cosign.key >> $GITHUB_OUTPUT
+          cat cosign.key >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
 
       # 3. Build Image
-      # Now the action sees 'cosign.pub' on disk AND gets the private key via input.
       - name: Build Custom Image
         uses: blue-build/github-action@v1
         with:
           recipe: ${{ matrix.recipe }}
+          # Pass the key we just generated
           cosign_private_key: ${{ steps.keys.outputs.private_key }}
           registry_token: ${{ github.token }}
           pr_event_number: ${{ github.event.number }}

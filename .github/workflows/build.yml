@@ -32,14 +32,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Build Image (As Root)
+      - name: Install BlueBuild CLI
         run: |
-          docker run --rm \
-            -u root \
-            -v ${{ github.workspace }}:/github/workspace \
-            -w /github/workspace \
-            -e GITHUB_TOKEN=${{ github.token }} \
-            -e COSIGN_PRIVATE_KEY="" \
-            --entrypoint /bin/sh \
-            ghcr.io/blue-build/cli:latest \
-            -c "bluebuild build ./recipes/${{ matrix.recipe }} --registry ghcr.io --push --no-sign"
+          # Install the tool
+          curl -Ls https://sh.blue-build.org/install | bash
+          
+          # Verify it exists
+          ls -l $HOME/.local/bin/bluebuild
+
+      - name: Build Image
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # Run using the full path to guarantee it finds the command
+          $HOME/.local/bin/bluebuild build ./recipes/${{ matrix.recipe }} \
+            --registry ghcr.io \
+            --push \
+            --no-sign

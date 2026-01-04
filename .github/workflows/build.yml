@@ -34,19 +34,14 @@ jobs:
 
       - name: Install BlueBuild CLI
         run: |
-          # Download and install the BlueBuild binary manually
           curl -Ls https://sh.blue-build.org/install | bash
-          # Add it to the path for this session
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Build Image
         env:
-          # We pass the token so the CLI can push the image
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          # Run the build with the explicit --no-sign flag
-          # We use the full path to recipe to be safe
-          bluebuild build ./recipes/${{ matrix.recipe }} \
+          # We call the binary using its FULL PATH to avoid "command not found"
+          $HOME/.local/bin/bluebuild build ./recipes/${{ matrix.recipe }} \
             --registry ghcr.io \
             --push \
             --no-sign

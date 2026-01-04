@@ -27,11 +27,10 @@ jobs:
 
       - name: Build Image
         env:
-          # We pass the token so the CLI can push the image
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           # We run the builder container with --privileged
-          # This allows it to run Podman/Buildah inside itself
+          # We also fix the 'safe.directory' error that causes the crash
           docker run --rm \
             --privileged \
             -v ${{ github.workspace }}:/github/workspace \
@@ -40,4 +39,4 @@ jobs:
             -e COSIGN_PRIVATE_KEY="" \
             --entrypoint /bin/sh \
             ghcr.io/blue-build/cli:latest \
-            -c "bluebuild build ./recipes/${{ matrix.recipe }} --registry ghcr.io --registry-namespace ${{ github.repository_owner }} --push --no-sign"
+            -c "git config --global --add safe.directory /github/workspace && bluebuild build ./recipes/${{ matrix.recipe }} --registry ghcr.io --registry-namespace $(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]') --push --no-sign"

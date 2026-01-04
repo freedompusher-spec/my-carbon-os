@@ -7,7 +7,54 @@ on:
       - "**.md"
   pull_request:
   workflow_dispatch:
+name: bluebuild
+on:
+  schedule:
+    - cron: "00 17 * * *"
+  push:
+    paths-ignore:
+      - "**.md"
+  pull_request:
+  workflow_dispatch:
 
+jobs:
+  bluebuild:
+    name: Build Custom Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        recipe:
+          - recipe.yml
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Build Image
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # 1. We run the build container manually.
+          # 2. We fix the git safety check (which caused the silent crash before).
+          # 3. We pass --no-sign (which works now because cosign.pub exists).
+          
+          docker run --rm \
+            --privileged \
+            -v ${{ github.workspace }}:/github/workspace \
+            -w /github/workspace \
+            -e GITHUB_TOKEN=${{ github.token }} \
+            --entrypoint /bin/sh \
+            ghcr.io/blue-build/cli:latest \
+            -c "git config --global --add safe.directory /github/workspace && \
+                bluebuild build ./recipes/${{ matrix.recipe }} \
+                --registry ghcr.io \
+                --registry-namespace $(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]') \
+                --push \
+                --no-sign"
 jobs:
   bluebuild:
     name: Build Custom Image

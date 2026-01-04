@@ -29,15 +29,16 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.3.0
 
-      # 2. Generate Keys
-      - name: Setup Signing Keys
+      # 2. Generate a Throwaway Key (to satisfy the signer)
+      # We overwrite the dummy file you just created with a real (temporary) one.
+      - name: Generate Disposable Keys
         id: keys
         run: |
           export COSIGN_PASSWORD=""
-          # This command creates 'cosign.pub' and 'cosign.key' right here.
-          cosign generate-key-pair
+          # This overwrites your dummy cosign.pub with a valid one for this build
+          cosign generate-key-pair --force
           
-          # We read the Private Key into a variable for the next step.
+          # Read private key for the next step
           echo 'private_key<<EOF' >> $GITHUB_OUTPUT
           cat cosign.key >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
@@ -47,7 +48,6 @@ jobs:
         uses: blue-build/github-action@v1
         with:
           recipe: ${{ matrix.recipe }}
-          # Pass the key we just generated
           cosign_private_key: ${{ steps.keys.outputs.private_key }}
           registry_token: ${{ github.token }}
           pr_event_number: ${{ github.event.number }}

@@ -22,11 +22,14 @@ jobs:
         recipe:
           - recipe.yml
     steps:
-      - name: Build Custom Image
-        uses: blue-build/github-action@v1
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Build Image
+        uses: docker://ghcr.io/blue-build/cli:latest
         with:
-          recipe: ${{ matrix.recipe }}
-          registry_token: ${{ github.token }}
-          pr_event_number: ${{ github.event.number }}
-          # This is the fix: We tell the CLI explicitly not to sign
-          build_opts: "--no-sign"
+          args: build ./recipes/${{ matrix.recipe }} --registry ghcr.io --push --no-sign
+        env:
+          # We need to pass the token so it can push to GHCR
+          COSIGN_PRIVATE_KEY: "" # Explicitly empty to prevent key lookups
+          GITHUB_TOKEN: ${{ github.token }}

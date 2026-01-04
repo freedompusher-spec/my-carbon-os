@@ -1,14 +1,12 @@
 name: bluebuild
 on:
   schedule:
-    - cron: "00 17 * * *" # build at 17:00 UTC every day 
-                          # (20 minutes after last ublue images start building)
+    - cron: "00 17 * * *"
   push:
-    paths-ignore: # don't rebuild if only documentation has changed
+    paths-ignore:
       - "**.md"
-      
   pull_request:
-  workflow_dispatch: # allow manually triggering builds
+  workflow_dispatch:
 
 jobs:
   bluebuild:
@@ -19,18 +17,16 @@ jobs:
       packages: write
       id-token: write
     strategy:
-      fail-fast: false # stop GH from cancelling all matrix builds if one fails
+      fail-fast: false
       matrix:
         recipe:
-          # !! CHANGE THIS TO YOUR RECIPE FILENAME IF IT IS NOT recipe.yml !!
           - recipe.yml
     steps:
-       # the build is fully handled by the reusable github action
       - name: Build Custom Image
         uses: blue-build/github-action@v1
         with:
           recipe: ${{ matrix.recipe }}
-          cosign_private_key: "" # Explicitly empty
           registry_token: ${{ github.token }}
           pr_event_number: ${{ github.event.number }}
-          disable_signing: true # <--- THIS IS THE KEY FIX
+          # This is the fix: We tell the CLI explicitly not to sign
+          build_opts: "--no-sign"

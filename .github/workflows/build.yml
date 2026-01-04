@@ -7,15 +7,6 @@ on:
       - "**.md"
   pull_request:
   workflow_dispatch:
-name: bluebuild
-on:
-  schedule:
-    - cron: "00 17 * * *"
-  push:
-    paths-ignore:
-      - "**.md"
-  pull_request:
-  workflow_dispatch:
 
 jobs:
   bluebuild:
@@ -39,7 +30,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           # 1. We run the build container manually.
-          # 2. We fix the git safety check (which caused the silent crash before).
+          # 2. We fix the git safety check.
           # 3. We pass --no-sign (which works now because cosign.pub exists).
           
           docker run --rm \
@@ -55,48 +46,3 @@ jobs:
                 --registry-namespace $(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]') \
                 --push \
                 --no-sign"
-jobs:
-  bluebuild:
-    name: Build Custom Image
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    strategy:
-      fail-fast: false
-      matrix:
-        recipe:
-          - recipe.yml
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      # 1. Install Cosign
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.3.0
-
-      # 2. Generate a Throwaway Key (to satisfy the signer)
-      # We overwrite the dummy file you just created with a real (temporary) one.
-      - name: Generate Disposable Keys
-        id: keys
-        run: |
-          export COSIGN_PASSWORD=""
-          # This overwrites your dummy cosign.pub with a valid one for this build
-          cosign generate-key-pair --force
-          
-          # Read private key for the next step
-          echo 'private_key<<EOF' >> $GITHUB_OUTPUT
-          cat cosign.key >> $GITHUB_OUTPUT
-          echo 'EOF' >> $GITHUB_OUTPUT
-
-      # 3. Build Image
-      - name: Build Custom Image
-        uses: blue-build/github-action@v1
-        with:
-          recipe: ${{ matrix.recipe }}
-          cosign_private_key: ${{ steps.keys.outputs.private_key }}
-          registry_token: ${{ github.token }}
-          pr_event_number: ${{ github.event.number }}
-        env:
-          COSIGN_PASSWORD: ""

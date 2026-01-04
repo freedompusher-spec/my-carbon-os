@@ -25,12 +25,18 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Create Dummy Cosign File
+        run: |
+          # The tool crashes if this file is missing, even if we don't use it.
+          # We create a fake one to bypass the check.
+          touch cosign.pub
+
       - name: Build Image
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          # We run the builder container with --privileged
-          # We also fix the 'safe.directory' error that causes the crash
+          # 1. We force the directory to be "safe" for Git
+          # 2. We run the build with --verbose (-v) to see errors if they happen
           docker run --rm \
             --privileged \
             -v ${{ github.workspace }}:/github/workspace \
@@ -39,4 +45,10 @@ jobs:
             -e COSIGN_PRIVATE_KEY="" \
             --entrypoint /bin/sh \
             ghcr.io/blue-build/cli:latest \
-            -c "git config --global --add safe.directory /github/workspace && bluebuild build ./recipes/${{ matrix.recipe }} --registry ghcr.io --registry-namespace $(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]') --push --no-sign"
+            -c "git config --global --add safe.directory /github/workspace && \
+                bluebuild build ./recipes/${{ matrix.recipe }} \
+                --registry ghcr.io \
+                --registry-namespace $(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]') \
+                --push \
+                --no-sign \
+                -v"

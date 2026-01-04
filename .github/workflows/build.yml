@@ -25,22 +25,21 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Build Image (Manual)
-        env:
-          # Token needed to push the image
-          registry_token: ${{ github.token }}
-          # Explicitly empty key to prevent warnings
-          COSIGN_PRIVATE_KEY: ""
+      - name: Install BlueBuild CLI
+        uses: blue-build/github-action/setup-bluebuild@v1
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build Image
+        # We run the build command directly in the shell
+        # This gives us clear error logs if something fails
         run: |
-          # We run the builder container directly using docker
-          # This bypasses all the Action wrapper logic
-          docker run --rm \
-            -v ${{ github.workspace }}:/github/workspace \
-            -w /github/workspace \
-            -e GITHUB_TOKEN=$registry_token \
-            -e COSIGN_PRIVATE_KEY="" \
-            ghcr.io/blue-build/cli:latest \
-            bluebuild build ./recipes/${{ matrix.recipe }} \
+          bluebuild build ./recipes/${{ matrix.recipe }} \
             --registry ghcr.io \
             --push \
             --no-sign

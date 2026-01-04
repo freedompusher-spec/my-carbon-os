@@ -25,34 +25,35 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+      # 1. Install Cosign (The tool used for signing)
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.3.0
+
+      # 2. Generate a Dummy Key
+      # We create a disposable key pair so the build tool has something to use.
+      # This stops the "Missing Key" errors.
+      - name: Generate Disposable Keys
+        run: |
+          # Set empty password
+          export COSIGN_PASSWORD=""
+          # Generate key pair (cosign.key and cosign.pub)
+          cosign generate-key-pair
+          # Move them to root so BlueBuild finds them
+          mv cosign.key ./cosign.key
+          mv cosign.pub ./cosign.pub
+
+      # 3. Build Image (Using the standard action)
+      # Now that the keys exist, the standard action will work perfectly.
+      - name: Build Custom Image
+        uses: blue-build/github-action@v1
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
-      - name: Install BlueBuild (Global)
-        run: |
-          # Download the installer
-          curl -Ls https://sh.blue-build.org/install -o install_script.sh
-          chmod +x install_script.sh
-          
-          # Run installer but force it to a specific location we control
-          # We move the binary to /usr/local/bin so 'sudo' can see it
-          ./install_script.sh
-          sudo mv $HOME/.local/bin/bluebuild /usr/local/bin/bluebuild
-          sudo chmod +x /usr/local/bin/bluebuild
-
-      - name: Build Image (Verbose)
+          recipe: ${{ matrix.recipe }}
+          # We read the private key file we just generated
+          cosign_private_key: ${{ steps.keys.outputs.key }} 
+          registry_token: ${{ github.token }}
+          pr_event_number: ${{ github.event.number }}
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          # Run as sudo to avoid permission errors with Docker/Podman
-          # Use --debug to print EVERYTHING
-          sudo /usr/local/bin/bluebuild build ./recipes/${{ matrix.recipe }} \
-            --registry ghcr.io \
-            --registry-namespace $(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]') \
-            --push \
-            --no-sign \
-            --debug
+          # Pass the empty password so it can use the key
+          COSIGN_PASSWORD: ""
+          # We force it to read the key file from disk
+          COSIGN_PRIVATE_KEY: "file://cosign.key"

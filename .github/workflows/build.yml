@@ -34,18 +34,20 @@ jobs:
 
       - name: Install BlueBuild CLI
         run: |
-          # Install the tool
           curl -Ls https://sh.blue-build.org/install | bash
-          
-          # Verify it exists
-          ls -l $HOME/.local/bin/bluebuild
+
+      - name: Verify Recipe Exists
+        run: |
+          ls -l ./recipes/${{ matrix.recipe }}
 
       - name: Build Image
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          # Run using the full path to guarantee it finds the command
+          # We provide ALL the details explicitly to prevent guessing errors
           $HOME/.local/bin/bluebuild build ./recipes/${{ matrix.recipe }} \
             --registry ghcr.io \
+            --registry-namespace ${{ github.repository_owner }} \
             --push \
-            --no-sign
+            --no-sign \
+            -v
